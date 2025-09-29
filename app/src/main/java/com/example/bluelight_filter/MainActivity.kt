@@ -6,34 +6,21 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.SeekBar
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.net.toUri
-import com.example.bluelight_filter.databinding.ActivityMainBinding
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
     private var currentIntensity = 0
     private var currentDimming = 0
     private lateinit var dimmingButtons: List<Button>
-
-    private val requestOverlayPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { 
-        if (Settings.canDrawOverlays(this)) {
-            startFilterService(currentIntensity, currentDimming)
-        }
-    }
+    private lateinit var filterSwitch: SwitchMaterial
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        val filterSwitch = findViewById<SwitchMaterial>(R.id.filter_switch)
+        filterSwitch = findViewById(R.id.filter_switch)
         val intensitySlider = findViewById<SeekBar>(R.id.intensity_slider)
 
         dimmingButtons = listOf(
@@ -46,7 +33,12 @@ class MainActivity : AppCompatActivity() {
 
         filterSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                checkOverlayPermission()
+                if (!isAccessibilityServiceEnabled()) {
+                    promptToEnableAccessibilityService()
+                    filterSwitch.isChecked = false // Reset switch, user must re-toggle after enabling
+                } else {
+                    startFilterService(currentIntensity, currentDimming)
+                }
             } else {
                 stopFilterService()
             }
@@ -61,7 +53,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
@@ -69,14 +60,11 @@ class MainActivity : AppCompatActivity() {
             val clickedButton = view as Button
             val isAlreadySelected = clickedButton.isSelected
 
-            // Deselect all buttons first
             dimmingButtons.forEach { it.isSelected = false }
 
             if (isAlreadySelected) {
-                // If the clicked button was already selected, turn off dimming
                 currentDimming = 0
             } else {
-                // Otherwise, select the new button and set the dimming level
                 clickedButton.isSelected = true
                 currentDimming = when (clickedButton.id) {
                     R.id.dim_20 -> 20
@@ -96,29 +84,33 @@ class MainActivity : AppCompatActivity() {
         dimmingButtons.forEach { it.setOnClickListener(dimmingClickListener) }
     }
 
-    private fun checkOverlayPermission() {
-        if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                "package:$packageName".toUri()
-            )
-            requestOverlayPermissionLauncher.launch(intent)
-        } else {
-            startFilterService(currentIntensity, currentDimming)
-        }
+    override fun onResume() {
+        super.onResume()
+        // Sync the switch state with the actual service state when the user returns to the app
+        filterSwitch.isChecked = isAccessibilityServiceEnabled()
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val service = "$packageName/${AccessibilityFilterService::class.java.canonicalName}"
+        val enabledServices = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        return enabledServices?.contains(service, ignoreCase = false) == true
+    }
+
+    private fun promptToEnableAccessibilityService() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
     }
 
     private fun startFilterService(intensity: Int, dimming: Int) {
-        val intent = Intent(this, BlueLightFilterService::class.java)
+        val intent = Intent(this, AccessibilityFilterService::class.java)
         intent.putExtra("intensity", intensity)
         intent.putExtra("dimming", dimming)
         startService(intent)
     }
 
     private fun stopFilterService() {
-        val intent = Intent(this, BlueLightFilterService::class.java)
+        val intent = Intent(this, AccessibilityFilterService::class.java)
         stopService(intent)
-        // Deselect all buttons when the filter is turned off
         dimmingButtons.forEach { it.isSelected = false }
         currentDimming = 0
     }
