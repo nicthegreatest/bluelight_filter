@@ -7,17 +7,83 @@
     android:padding="16dp"
     app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <Switch
+    <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/filter_switch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Blue Light Filter" />
+        android:text="Blue Light Filter"
+        android:textColor="#CCCCCC" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Red Hue Intensity"
+        android:textColor="#CCCCCC" />
 
     <SeekBar
         android:id="@+id/intensity_slider"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:max="100" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Screen Dimmer"
+        android:textColor="#CCCCCC" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/dim_20"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/dimming_button_tint"
+            android:text="20%"
+            android:textColor="#CCCCCC" />
+
+        <Button
+            android:id="@+id/dim_40"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/dimming_button_tint"
+            android:text="40%"
+            android:textColor="#CCCCCC" />
+
+        <Button
+            android:id="@+id/dim_60"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/dimming_button_tint"
+            android:text="60%"
+            android:textColor="#CCCCCC" />
+
+        <Button
+            android:id="@+id/dim_80"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/dimming_button_tint"
+            android:text="80%"
+            android:textColor="#CCCCCC" />
+
+        <Button
+            android:id="@+id/dim_90"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/dimming_button_tint"
+            android:text="90%"
+            android:textColor="#CCCCCC" />
+
+    </LinearLayout>
 
 </LinearLayout>

@@ -1,18 +1,31 @@
 package com.example.bluelight_filter
 
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
+import android.widget.Button
 import android.widget.SeekBar
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
 import com.example.bluelight_filter.databinding.ActivityMainBinding
+import com.google.android.material.switchmaterial.SwitchMaterial
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE = 1
+    private var currentIntensity = 0
+    private var currentDimming = 0
+    private lateinit var dimmingButtons: List<Button>
+
+    private val requestOverlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { 
+        if (Settings.canDrawOverlays(this)) {
+            startFilterService(currentIntensity, currentDimming)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,15 +33,16 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Since we have included the content_main.xml in activity_main.xml, we need to access the views from the binding object of activity_main.xml.
-        // The id of the included layout is not specified, so we can't access it directly.
-        // We will assume the binding object for content_main is merged into ActivityMainBinding.
-        // However, the correct way is to get the root of the included layout and then find the views by id.
-        // For simplicity, we will assume the binding works as follows.
-        // val contentBinding = ContentMainBinding.bind(binding.root)
-
-        val filterSwitch = findViewById<android.widget.Switch>(R.id.filter_switch)
+        val filterSwitch = findViewById<SwitchMaterial>(R.id.filter_switch)
         val intensitySlider = findViewById<SeekBar>(R.id.intensity_slider)
+
+        dimmingButtons = listOf(
+            findViewById(R.id.dim_20),
+            findViewById(R.id.dim_40),
+            findViewById(R.id.dim_60),
+            findViewById(R.id.dim_80),
+            findViewById(R.id.dim_90)
+        )
 
         filterSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
@@ -40,8 +54,9 @@ class MainActivity : AppCompatActivity() {
 
         intensitySlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                currentIntensity = progress
                 if (filterSwitch.isChecked) {
-                    startFilterService(progress)
+                    startFilterService(currentIntensity, currentDimming)
                 }
             }
 
@@ -49,43 +64,62 @@ class MainActivity : AppCompatActivity() {
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+
+        val dimmingClickListener = View.OnClickListener { view ->
+            val clickedButton = view as Button
+            val isAlreadySelected = clickedButton.isSelected
+
+            // Deselect all buttons first
+            dimmingButtons.forEach { it.isSelected = false }
+
+            if (isAlreadySelected) {
+                // If the clicked button was already selected, turn off dimming
+                currentDimming = 0
+            } else {
+                // Otherwise, select the new button and set the dimming level
+                clickedButton.isSelected = true
+                currentDimming = when (clickedButton.id) {
+                    R.id.dim_20 -> 20
+                    R.id.dim_40 -> 40
+                    R.id.dim_60 -> 60
+                    R.id.dim_80 -> 80
+                    R.id.dim_90 -> 90
+                    else -> 0
+                }
+            }
+
+            if (filterSwitch.isChecked) {
+                startFilterService(currentIntensity, currentDimming)
+            }
+        }
+
+        dimmingButtons.forEach { it.setOnClickListener(dimmingClickListener) }
     }
 
     private fun checkOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-                startActivityForResult(intent, ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE)
-            } else {
-                startFilterService(findViewById<SeekBar>(R.id.intensity_slider).progress)
-            }
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                "package:$packageName".toUri()
+            )
+            requestOverlayPermissionLauncher.launch(intent)
         } else {
-            startFilterService(findViewById<SeekBar>(R.id.intensity_slider).progress)
+            startFilterService(currentIntensity, currentDimming)
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (Settings.canDrawOverlays(this)) {
-                    startFilterService(findViewById<SeekBar>(R.id.intensity_slider).progress)
-                }
-            }
-        }
-    }
-
-    private fun startFilterService(intensity: Int) {
+    private fun startFilterService(intensity: Int, dimming: Int) {
         val intent = Intent(this, BlueLightFilterService::class.java)
         intent.putExtra("intensity", intensity)
+        intent.putExtra("dimming", dimming)
         startService(intent)
     }
 
     private fun stopFilterService() {
         val intent = Intent(this, BlueLightFilterService::class.java)
         stopService(intent)
+        // Deselect all buttons when the filter is turned off
+        dimmingButtons.forEach { it.isSelected = false }
+        currentDimming = 0
     }
 }

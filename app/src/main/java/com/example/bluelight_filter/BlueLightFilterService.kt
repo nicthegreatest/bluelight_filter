@@ -11,41 +11,59 @@ import android.view.WindowManager
 class BlueLightFilterService : Service() {
 
     private lateinit var overlayView: View
+    private lateinit var windowManager: WindowManager
+    private lateinit var layoutParams: WindowManager.LayoutParams
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val intensity = intent?.getIntExtra("intensity", 20) ?: 20
-        val red = 255
-        val green = 255 - (intensity * 2.55).toInt()
-        val blue = 255 - (intensity * 2.55).toInt()
-        val color = Color.argb(50, red, green, blue)
+    override fun onCreate() {
+        super.onCreate()
+        overlayView = View(this)
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        layoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        )
+        windowManager.addView(overlayView, layoutParams)
+    }
 
-        if (!::overlayView.isInitialized) {
-            overlayView = View(this)
-            val layoutParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                PixelFormat.TRANSLUCENT
-            )
-            val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-            windowManager.addView(overlayView, layoutParams)
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val intensity = intent?.getIntExtra("intensity", 0) ?: 0
+        val dimming = intent?.getIntExtra("dimming", 0) ?: 0
+
+        // Red Hue Logic
+        val redHueAlpha = (intensity / 100.0f * 100).toInt().coerceIn(0, 255)
+        val red = 255
+        val green = 255 - (intensity * 1.5).toInt().coerceIn(0, 255)
+        val blue = 255 - (intensity * 2.0).toInt().coerceIn(0, 255)
+        val color = Color.argb(redHueAlpha, red, green, blue)
+        overlayView.setBackgroundColor(color)
+
+        // Dimming Logic
+        if (dimming == 0) {
+            // When slider is at 0, use the system's default brightness.
+            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        } else {
+            // Map slider (1-100) to a wider brightness range (0.8f -> 0.0f)
+            val brightness = 0.8f - (((dimming - 1) / 99.0f) * 0.8f)
+            layoutParams.screenBrightness = brightness.coerceIn(0.0f, 1.0f)
         }
 
-        overlayView.setBackgroundColor(color)
+        windowManager.updateViewLayout(overlayView, layoutParams)
 
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::overlayView.isInitialized) {
-            val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-            windowManager.removeView(overlayView)
-        }
+        // Always reset brightness to default when the service is destroyed.
+        layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        windowManager.updateViewLayout(overlayView, layoutParams)
+        windowManager.removeView(overlayView)
     }
 }
