@@ -18,7 +18,6 @@ class AccessibilityFilterService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         overlayView = View(this)
-        // Request that the view be laid out as if the status bar is not there, and in a stable way.
         @Suppress("DEPRECATION")
         overlayView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -55,23 +54,37 @@ class AccessibilityFilterService : AccessibilityService() {
         val intensity = intent?.getIntExtra("intensity", 0) ?: 0
         val dimming = intent?.getIntExtra("dimming", 0) ?: 0
 
-        // Red Hue Logic
-        val redHueAlpha = (intensity / 100.0f * 100).toInt().coerceIn(0, 255)
+        // --- Combined Color Calculation ---
+
+        // 1. Define the alpha (opacity) for the red hue and dimming effects.
+        // Red hue alpha is scaled to a max of ~60% opacity to avoid oversaturation.
+        val alphaRed = (intensity / 100.0f) * 0.6f
+        val alphaDim = dimming / 100.0f
+
+        // 2. Calculate the RGB components for the red hue filter.
         val red = 255
         val green = 255 - (intensity * 1.5).toInt().coerceIn(0, 255)
         val blue = 255 - (intensity * 2.0).toInt().coerceIn(0, 255)
-        val color = Color.argb(redHueAlpha, red, green, blue)
-        overlayView.setBackgroundColor(color)
 
-        // Dimming Logic
-        if (dimming == 0) {
-            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        // 3. Blend the two layers (dimming black layer over red hue layer).
+        // This formula calculates the final color of a single overlay that has both effects.
+        val finalAlpha = alphaRed + alphaDim - (alphaRed * alphaDim)
+
+        if (finalAlpha < 0.01f) {
+            overlayView.setBackgroundColor(Color.TRANSPARENT)
         } else {
-            val brightness = 0.8f - (((dimming - 1) / 99.0f) * 0.8f)
-            layoutParams.screenBrightness = brightness.coerceIn(0.0f, 1.0f)
-        }
+            val finalRed = (red * alphaRed * (1 - alphaDim)) / finalAlpha
+            val finalGreen = (green * alphaRed * (1 - alphaDim)) / finalAlpha
+            val finalBlue = (blue * alphaRed * (1 - alphaDim)) / finalAlpha
 
-        windowManager.updateViewLayout(overlayView, layoutParams)
+            val finalColor = Color.argb(
+                (finalAlpha * 255).toInt(),
+                finalRed.toInt(),
+                finalGreen.toInt(),
+                finalBlue.toInt()
+            )
+            overlayView.setBackgroundColor(finalColor)
+        }
 
         return START_STICKY
     }
@@ -83,8 +96,6 @@ class AccessibilityFilterService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         if (::overlayView.isInitialized) {
-            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-            windowManager.updateViewLayout(overlayView, layoutParams)
             windowManager.removeView(overlayView)
         }
     }
