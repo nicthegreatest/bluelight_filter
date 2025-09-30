@@ -18,6 +18,12 @@ class AccessibilityFilterService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         overlayView = View(this)
+        // Request that the view be laid out as if the status bar is not there, and in a stable way.
+        @Suppress("DEPRECATION")
+        overlayView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        )
+
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -31,9 +37,17 @@ class AccessibilityFilterService : AccessibilityService() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            layoutParams.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+
         windowManager.addView(overlayView, layoutParams)
     }
 
