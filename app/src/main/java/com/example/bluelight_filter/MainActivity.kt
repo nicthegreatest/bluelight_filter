@@ -15,13 +15,14 @@ class MainActivity : AppCompatActivity() {
     private var currentDimming = 0
     private lateinit var dimmingButtons: List<Button>
     private lateinit var filterSwitch: SwitchMaterial
+    private lateinit var intensitySlider: SeekBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         filterSwitch = findViewById(R.id.filter_switch)
-        val intensitySlider = findViewById<SeekBar>(R.id.intensity_slider)
+        intensitySlider = findViewById(R.id.intensity_slider)
 
         dimmingButtons = listOf(
             findViewById(R.id.dim_20),
@@ -37,9 +38,11 @@ class MainActivity : AppCompatActivity() {
                     promptToEnableAccessibilityService()
                     filterSwitch.isChecked = false // Reset switch, user must re-toggle after enabling
                 } else {
+                    // When turning on, restore the filter to the remembered intensity.
                     startFilterService(currentIntensity, currentDimming)
                 }
             } else {
+                // When turning off, make the filter transparent but preserve the settings.
                 stopFilterService()
             }
         }
@@ -86,7 +89,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Sync the switch state with the actual service state when the user returns to the app
         filterSwitch.isChecked = isAccessibilityServiceEnabled()
     }
 
@@ -109,8 +111,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopFilterService() {
-        val intent = Intent(this, AccessibilityFilterService::class.java)
-        stopService(intent)
+        // Command the service to become fully transparent.
+        startFilterService(0, 0)
+
+        // Reset the dimming UI, but preserve the intensity slider's position.
         dimmingButtons.forEach { it.isSelected = false }
         currentDimming = 0
     }
